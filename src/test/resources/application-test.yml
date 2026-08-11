@@ -1,0 +1,24 @@
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+  # Redis/RabbitMQ tests walata one naa (Week 1). Health checks off.
+app:
+  seed:
+    enabled: false
+  jwt:
+    secret: test-only-secret-key-that-is-definitely-long-enough-32plus-bytes
+    access-ttl-minutes: 15
+    refresh-ttl-days: 7
+    issuer: clinic-booking-api
+management:
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    lk.kavindu.clinic: INFO
