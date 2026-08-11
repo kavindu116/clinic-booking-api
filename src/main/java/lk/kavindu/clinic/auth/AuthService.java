@@ -28,6 +28,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TokenRevocationService tokenRevocationService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -86,9 +87,8 @@ public class AuthService {
                         "Invalid refresh token"));
 
         if (stored.isRevoked()) {
-            // Reuse detected — meka theft ekak wenna puluwan
             log.warn("Revoked refresh token reuse detected for userId={}", stored.getUser().getId());
-            refreshTokenRepository.revokeAllForUser(stored.getUser().getId());
+            tokenRevocationService.revokeAllForUser(stored.getUser().getId());
             throw ApiException.of(ErrorCode.TOKEN_INVALID,
                     "Refresh token has been revoked. Please log in again.");
         }
@@ -111,8 +111,8 @@ public class AuthService {
 
     @Transactional
     public void logout(Long userId) {
-        int revoked = refreshTokenRepository.revokeAllForUser(userId);
-        log.info("Logout: revoked {} refresh token(s) for userId={}", revoked, userId);
+       tokenRevocationService.revokeAllForUser(userId);
+        log.info("Logout: revoked {} refresh token(s) for userId={}", userId);
     }
 
     // ---------------------------------------------------------------
