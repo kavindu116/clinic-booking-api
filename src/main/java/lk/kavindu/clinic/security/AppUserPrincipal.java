@@ -10,10 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * SecurityContext eke thiyena principal eka. Controllers walin
- * @AuthenticationPrincipal walin access karanna puluwan.
- */
+
 @Getter
 public class AppUserPrincipal implements UserDetails {
 

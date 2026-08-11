@@ -16,11 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-/**
- * Spring Security eke errors (401/403) filter chain eke wenne, controllers
- * wala nemei — ee nisa @RestControllerAdvice eka ee walata weda karanne naa.
- * Ekai me class eka. Errors okkoma ekama JSON shape eken enawa.
- */
+
 @Component
 @RequiredArgsConstructor
 public class RestAuthEntryPoint implements AuthenticationEntryPoint, AccessDeniedHandler {

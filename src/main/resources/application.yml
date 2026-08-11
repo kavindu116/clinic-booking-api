@@ -14,8 +14,8 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate       # Flyway thamai schema eka handle karanne. NEVER 'update'.
-    open-in-view: false        # OSIV off — lazy loading traps welakwa gannawa
+      ddl-auto: validate
+    open-in-view: false        #
     properties:
       hibernate:
         jdbc.time_zone: UTC
@@ -59,7 +59,7 @@ app:
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
     issuer: clinic-booking-api
   seed:
-    enabled: ${SEED_ENABLED:true}     # dev ekata admin user ekak hadanawa
+    enabled: ${SEED_ENABLED:true}
 
 management:
   endpoints:

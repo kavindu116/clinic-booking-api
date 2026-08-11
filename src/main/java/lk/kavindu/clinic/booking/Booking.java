@@ -42,10 +42,7 @@ public class Booking extends BaseEntity {
     @Column(length = 500)
     private String notes;
 
-    /**
-     * Optimistic locking. Dennek ekama booking eka update kalot,
-     * dewani ekata OptimisticLockingFailureException ekak enawa.
-     */
+
     @Version
     @Column(nullable = false)
     private Long version;

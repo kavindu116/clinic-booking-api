@@ -19,13 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Har request ekakatama ekwarak duwanawa. Bearer token eka validate karala
- * SecurityContext eka set karanawa.
- *
- * Wadagath: token eka DB eken load karanne naa — claims walin principal eka
- * hadanawa. Ee nisa request ekakata DB hit ekak adui.
- */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

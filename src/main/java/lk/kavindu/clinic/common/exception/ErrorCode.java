@@ -2,11 +2,7 @@ package lk.kavindu.clinic.common.exception;
 
 import org.springframework.http.HttpStatus;
 
-/**
- * Har error ekakatama stable code ekak. Client eka message eka parse
- * karanne naa, code eka balanawa — ee nisa message eka wenas kalath
- * client eka kadenne naa.
- */
+
 public enum ErrorCode {
 
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),

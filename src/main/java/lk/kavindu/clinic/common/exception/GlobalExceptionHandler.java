@@ -18,13 +18,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Har exception ekakma me thanata enawa. Controllers wala try/catch naa.
- *
- * Wadagath: internal exception messages client ekata leak wenne naa.
- * Stack traces log ekata witharai — attacker kenekta internal structure
- * eka penne naa.
- */
+
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -38,7 +32,7 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(code.status().value(), code.name(), ex.getMessage(), req.getRequestURI()));
     }
 
-    /** @Valid fail unama — field ekakata message ekak denawa. */
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex,
                                                      HttpServletRequest req) {
@@ -64,11 +58,7 @@ public class GlobalExceptionHandler {
                 req.getRequestURI()));
     }
 
-    /**
-     * DB constraint eka break unama. Me project eke lokuma use case eka:
-     * uq_active_booking_slot partial unique index eka. Race condition ekakedi
-     * application check eka pass unath, DB eka meken nawaththanawa.
-     */
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex,
                                                     HttpServletRequest req) {
@@ -91,7 +81,7 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(code.status().value(), code.name(), message, req.getRequestURI()));
     }
 
-    /** @Version conflict — dennek ekama row eka ekawara update kalama. */
+
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleOptimisticLock(OptimisticLockingFailureException ex,
                                                          HttpServletRequest req) {
@@ -131,7 +121,7 @@ public class GlobalExceptionHandler {
                 req.getRequestURI()));
     }
 
-    /** Balaporoththu novu ewa. Client ekata details denne naa. */
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest req) {
         log.error("Unhandled exception on {} {}", req.getMethod(), req.getRequestURI(), ex);

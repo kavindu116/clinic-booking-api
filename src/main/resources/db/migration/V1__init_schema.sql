@@ -16,8 +16,7 @@ CREATE TABLE users (
     CONSTRAINT chk_users_role CHECK (role IN ('PATIENT', 'DOCTOR', 'ADMIN'))
 );
 
--- Refresh tokens: plain token eka DB eke thiyanne naa, SHA-256 hash eka witharai.
--- DB leak ekak unath tokens use karanna baa.
+
 CREATE TABLE refresh_tokens (
     id          BIGSERIAL PRIMARY KEY,
     user_id     BIGINT       NOT NULL,
@@ -48,8 +47,7 @@ CREATE TABLE doctors (
 CREATE INDEX idx_doctors_specialization ON doctors (specialization);
 CREATE INDEX idx_doctors_active ON doctors (active);
 
--- Slots pre-generate karanne naa. Doctor kenekge weekly rule eka meke thiyenawa,
--- actual slots runtime ekedi calculate wenawa. Rows million ganan hadenne naa.
+
 CREATE TABLE availability (
     id                    BIGSERIAL PRIMARY KEY,
     doctor_id             BIGINT   NOT NULL,
@@ -84,13 +82,7 @@ CREATE TABLE bookings (
     CONSTRAINT chk_bookings_order  CHECK (slot_end > slot_start)
 );
 
--- ====================  ME PROJECT EKE HEART EKA  ====================
--- Partial unique index. Doctor kenekge ekama slot ekata active booking
--- ekakata wada thiyenna baa. Cancelled ewa count wenne naa, ee nisa
--- cancel karapu slot ekak aayemath book karanna puluwan.
--- Application-level check eka race condition ekakedi fail unath,
--- DB eka last line of defence eka widihata weda karanawa.
--- ===================================================================
+
 CREATE UNIQUE INDEX uq_active_booking_slot
     ON bookings (doctor_id, slot_start)
     WHERE status <> 'CANCELLED';

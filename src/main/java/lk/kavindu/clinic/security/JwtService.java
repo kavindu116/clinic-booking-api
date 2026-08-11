@@ -13,13 +13,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 
-/**
- * Access token: short-lived (15 min), stateless, DB hit ekak naa.
- * Refresh token: long-lived (7 days), DB eke hash ekak thiyenawa, revoke karanna puluwan.
- *
- * Mokada dekak? Access token eka leak unath 15 min ekakin useless.
- * Refresh token eka DB eke nisa logout ekedi instantly kill karanna puluwan.
- */
+
 @Slf4j
 @Service
 public class JwtService {

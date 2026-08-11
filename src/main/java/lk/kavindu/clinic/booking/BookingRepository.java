@@ -17,13 +17,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * ========== CONCURRENCY CONTROL ==========
-     * PESSIMISTIC_WRITE => SELECT ... FOR UPDATE.
-     * Thread A meka call kalama, DB eka ee rows lock karanawa.
-     * Thread B ta thawath thoppe inna wenawa A ge transaction eka ivara wenakan.
-     * Ee nisa "check-then-act" race condition eka nawathinawa.
-     *
-     * (DB eke partial unique index eka last line of defence eka widihata thiyenawa.)
-     */
+     * PESSIMISTIC_WRITE => SELECT ... FOR UPDATE.**/
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
            SELECT b FROM Booking b
@@ -34,7 +28,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> lockActiveBySlot(@Param("doctorId") Long doctorId,
                                    @Param("slotStart") Instant slotStart);
 
-    /** Dawasakata thiyena booked slots — availability calculate karanna. */
+
     @Query("""
            SELECT b FROM Booking b
            WHERE b.doctor.id = :doctorId
@@ -54,7 +48,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @EntityGraph(attributePaths = {"patient", "doctor", "doctor.user"})
     Optional<Booking> findWithDetailsById(Long id);
 
-    /** Business rule: patient kenekta upcoming bookings ganana limit karanna. */
+
     @Query("""
            SELECT COUNT(b) FROM Booking b
            WHERE b.patient.id = :patientId

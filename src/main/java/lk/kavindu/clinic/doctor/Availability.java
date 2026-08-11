@@ -7,13 +7,7 @@ import lombok.*;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 
-/**
- * Doctor kenekge weekly recurring schedule eka.
- * Udaharanak: Monday 09:00-12:00, 30 min slots => slots 6ak.
- *
- * Slots pre-generate karanne naa — bookings table eka ekka compare karala
- * runtime ekedi calculate karanawa (Week 2).
- */
+
 @Entity
 @Table(name = "availability")
 @Getter

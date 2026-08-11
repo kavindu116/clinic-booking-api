@@ -12,7 +12,7 @@ import java.util.Optional;
 
 public interface DoctorRepository extends JpaRepository<Doctor, Long> {
 
-    /** EntityGraph eka N+1 query problem eka welakwanawa. */
+
     @EntityGraph(attributePaths = "user")
     Optional<Doctor> findWithUserById(Long id);
 

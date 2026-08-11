@@ -3,10 +3,6 @@ package lk.kavindu.clinic.common.dto;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Har error response ekakma me shape ekamai. Consistent errors =
- * client-side handling ekata pahasui.
- */
 public record ApiError(
         Instant timestamp,
         int status,

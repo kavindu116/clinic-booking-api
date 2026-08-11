@@ -58,8 +58,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        // Wadagath: email hoyaganna baripu welawe saha password wradi welawe
-        // ekama error eka denawa. Nathnam attacker kenekta emails enumerate karanna puluwan.
+
         User user = userRepository.findByEmailIgnoreCase(request.email().trim())
                 .orElseThrow(() -> ApiException.of(ErrorCode.INVALID_CREDENTIALS,
                         "Invalid email or password"));
@@ -78,11 +77,6 @@ public class AuthService {
         return issueTokens(user);
     }
 
-    /**
-     * Refresh token rotation: parana eka revoke karala aluth ekak denawa.
-     * Token ekak dewathawak use karanna hadanawanam, eka steal karapu ekak
-     * wenna puluwan — ee nisa ee user ge okkoma tokens kill karanawa.
-     */
     @Transactional
     public AuthResponse refresh(RefreshRequest request) {
         String hash = sha256(request.refreshToken());
@@ -138,7 +132,7 @@ public class AuthService {
                 jwtService.accessTtlSeconds(), UserSummary.from(user));
     }
 
-    /** 256-bit random, URL-safe. JWT ekak nemei — opaque token ekak. */
+
     private String generateRefreshToken() {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);

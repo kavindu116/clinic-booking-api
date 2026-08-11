@@ -26,7 +26,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity          // @PreAuthorize service layer eke use karanna
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
