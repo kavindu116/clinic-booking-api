@@ -15,8 +15,8 @@ concurrency-safe reservations, stateless JWT auth, and a real deployment pipelin
 ## Why this project exists
 
 Most portfolio CRUD apps quietly break under concurrent load. This one is built around a
-problem that actually has a correct and an incorrect answer: **two patients requesting the
-same appointment slot at the same instant must not both succeed.**
+problem that has a correct and an incorrect answer: **two patients requesting the same
+appointment slot at the same instant must not both succeed.**
 
 The naive implementation has a check-then-act race:
 
@@ -28,13 +28,31 @@ T2: INSERT booking
 -> one slot, two patients
 ```
 
-The fix here uses two independent layers:
+### Why `SELECT ... FOR UPDATE` is not the answer
 
-1. **Pessimistic row lock** — `SELECT ... FOR UPDATE` on the doctor's bookings for that
-   slot (`BookingRepository.lockActiveBySlot`). The second transaction blocks until the
-   first commits, then sees the real state.
-2. **Partial unique index** — a database-level guarantee that survives application bugs,
-   multiple app instances, and manual SQL:
+The obvious fix is a pessimistic row lock. It does not work here, and the reason is worth
+knowing: `FOR UPDATE` locks **rows that exist**. When the first booking for a slot is
+created, no row exists yet — so there is nothing to lock, both transactions see an empty
+result, and both insert.
+
+PostgreSQL under `READ COMMITTED` does not take a lock on a non-existent row. (MySQL's
+InnoDB does, via gap locks under `REPEATABLE READ` — so this bug is database-specific,
+which is exactly why the tests run against real PostgreSQL rather than H2.)
+
+### What this uses instead
+
+**Layer 1 — a transaction-scoped advisory lock**, keyed on `(doctorId, slotStart)`:
+
+```sql
+SELECT pg_advisory_xact_lock(doctor_id, slot_key)
+```
+
+Advisory locks are not tied to rows. The application names a lock and PostgreSQL
+serialises everyone who asks for the same name. `_xact_` scoping means the lock releases
+automatically on commit or rollback, so a forgotten unlock cannot strand a session. The
+lock is per-slot, not per-doctor, so bookings for different times still run in parallel.
+
+**Layer 2 — a partial unique index**, as the correctness backstop:
 
 ```sql
 CREATE UNIQUE INDEX uq_active_booking_slot
@@ -42,12 +60,28 @@ CREATE UNIQUE INDEX uq_active_booking_slot
     WHERE status <> 'CANCELLED';
 ```
 
-Cancelled bookings are excluded from the index, so a released slot becomes bookable again
-without soft-delete gymnastics. When the index does fire, `GlobalExceptionHandler` maps it
-to a clean `409 SLOT_ALREADY_BOOKED` rather than a 500.
+This holds even if the application has a bug, runs as several instances, or someone
+writes SQL by hand. Cancelled bookings are excluded from the index, so a released slot
+becomes bookable again without soft-delete gymnastics. When the index does fire,
+`GlobalExceptionHandler` maps it to a clean `409 SLOT_ALREADY_BOOKED` rather than a 500.
 
-This is verified by a concurrency test that fires N threads at one slot and asserts exactly
-one success (Week 3).
+Layer 1 gives a good user experience. Layer 2 guarantees correctness.
+
+`BookingConcurrencyIT` proves it: ten threads, one slot, exactly one success and nine
+clean 409s — and it asserts that **no** thread reaches the database constraint, since
+that would mean layer 1 had silently stopped working.
+
+### Slots are derived, not stored
+
+A doctor's schedule is one row per weekly block — "Mondays, 09:00–13:00, 30-minute
+slots". Bookable times are computed from that rule at request time and diffed against
+existing bookings. Materialising slots instead would mean roughly 1,250 rows per doctor
+per year, almost all of them empty, and a schedule change would mean regenerating them.
+
+The derivation lives in `SlotCalculator`, a pure function with no Spring context and no
+database, so its twenty-odd edge cases (partial trailing slots, midnight wrap, timezone
+conversion, split morning/afternoon blocks) are covered by unit tests that run in
+milliseconds.
 
 ---
 
@@ -166,7 +200,7 @@ open target/site/jacoco/index.html
 
 ## API surface
 
-### Implemented
+### Auth
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -175,12 +209,42 @@ open target/site/jacoco/index.html
 | POST | `/api/v1/auth/refresh` | — | Rotate refresh token |
 | POST | `/api/v1/auth/logout` | Bearer | Revoke all refresh tokens |
 | GET | `/api/v1/auth/me` | Bearer | Current user |
-| GET | `/actuator/health` | — | Liveness / readiness |
 
-### Planned
+### Doctors and availability
 
-`/api/v1/doctors`, `/api/v1/doctors/{id}/availability`, `/api/v1/doctors/{id}/slots`,
-`/api/v1/bookings` (create, cancel, reschedule, list), `/api/v1/admin/**`.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/doctors` | — | List active doctors, filter by specialization |
+| GET | `/api/v1/doctors/specializations` | — | Distinct specializations offered |
+| GET | `/api/v1/doctors/{id}` | — | Doctor profile |
+| GET | `/api/v1/doctors/{id}/availability` | — | Weekly availability rules |
+| GET | `/api/v1/doctors/{id}/slots?date=` | — | **Derived** bookable slots for a date |
+| POST | `/api/v1/doctors` | Admin | Create a doctor account |
+| PUT | `/api/v1/doctors/{id}/availability` | Admin or self | Replace the weekly schedule |
+| DELETE | `/api/v1/doctors/{id}` | Admin | Deactivate (soft delete) |
+
+### Bookings
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/v1/bookings` | Patient | Book a slot — concurrency-safe |
+| GET | `/api/v1/bookings/me` | Patient | Own bookings, paginated |
+| GET | `/api/v1/bookings/{id}` | Owner/doctor/admin | One booking |
+| PATCH | `/api/v1/bookings/{id}/cancel` | Owner/doctor/admin | Cancel |
+| PATCH | `/api/v1/bookings/{id}/reschedule` | Owner/doctor/admin | Move to another slot |
+| GET | `/api/v1/bookings/doctors/{id}` | Doctor or admin | A doctor's schedule |
+
+### Booking rules
+
+Configurable under `app.clinic` — defaults in brackets.
+
+- Slot must exist on the doctor's availability grid
+- Not in the past; at least `min-advance-booking-minutes` [30] ahead
+- At most `max-advance-booking-days` [60] ahead
+- At most `max-upcoming-bookings-per-patient` [3] confirmed future bookings
+- A patient cannot hold two appointments at the same time, even with different doctors
+- Patients must cancel `cancellation-window-hours` [4] before the slot; staff are exempt
+- Requesting someone else's booking returns 404, not 403, so IDs cannot be enumerated
 
 ---
 
@@ -202,7 +266,7 @@ open target/site/jacoco/index.html
 ## Roadmap
 
 - [x] **Week 1** — Schema, migrations, JWT auth with rotation, error envelope, Docker Compose, CI
-- [ ] **Week 2** — Doctor and availability management, slot derivation, booking create/cancel/reschedule, concurrency control
+- [x] **Week 2** — Doctor and availability management, slot derivation, booking create/cancel/reschedule, advisory-lock concurrency control
 - [ ] **Week 3** — Outbox + RabbitMQ notifications, Redis caching and rate limiting, concurrency test suite, observability
 - [ ] **Week 4** — Deploy to Oracle Cloud (ARM), TLS via Caddy, live Swagger, demo video
 
