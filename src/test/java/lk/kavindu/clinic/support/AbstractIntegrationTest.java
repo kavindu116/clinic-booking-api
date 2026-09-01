@@ -1,5 +1,11 @@
 package lk.kavindu.clinic.support;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lk.kavindu.clinic.booking.BookingRepository;
+import lk.kavindu.clinic.doctor.AvailabilityRepository;
+import lk.kavindu.clinic.doctor.DoctorRepository;
+import lk.kavindu.clinic.user.RefreshTokenRepository;
+import lk.kavindu.clinic.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -11,21 +17,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import lk.kavindu.clinic.user.RefreshTokenRepository;
-import lk.kavindu.clinic.user.UserRepository;
-
-/**
- * H2 nemei, REAL Postgres ekak. Mokada?
- *   - Partial unique index (WHERE status <> 'CANCELLED') H2 eke support naa
- *   - SELECT ... FOR UPDATE behaviour eka DB ekakin ekakata wenas
- *   - Flyway migrations real ekakin test wenawa
- * Meka thamai "test ekak pass wela production eke kadenne naa" kiyana eka.
- *
- * Container eka static — okkoma test classes walata ekama container eka
- * reuse wenawa (test suite eka wegawath wenawa).
- */
 @Testcontainers
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -54,9 +45,16 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected ObjectMapper objectMapper;
     @Autowired protected UserRepository userRepository;
     @Autowired protected RefreshTokenRepository refreshTokenRepository;
+    @Autowired protected DoctorRepository doctorRepository;
+    @Autowired protected AvailabilityRepository availabilityRepository;
+    @Autowired protected BookingRepository bookingRepository;
 
+    /** FK order eka wædagath — children palamuwen. */
     @BeforeEach
     void cleanDatabase() {
+        bookingRepository.deleteAll();
+        availabilityRepository.deleteAll();
+        doctorRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
     }

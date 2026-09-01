@@ -17,12 +17,17 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
     Optional<Doctor> findWithUserById(Long id);
 
     @EntityGraph(attributePaths = "user")
+    @Query("SELECT d FROM Doctor d WHERE d.active = true")
+    Page<Doctor> findAllActive(Pageable pageable);
+
+    @EntityGraph(attributePaths = "user")
     @Query("""
            SELECT d FROM Doctor d
            WHERE d.active = true
-             AND (:specialization IS NULL OR LOWER(d.specialization) = LOWER(:specialization))
+             AND LOWER(d.specialization) = LOWER(:specialization)
            """)
-    Page<Doctor> findActive(@Param("specialization") String specialization, Pageable pageable);
+    Page<Doctor> findActiveBySpecialization(@Param("specialization") String specialization,
+                                            Pageable pageable);
 
     @Query("SELECT DISTINCT d.specialization FROM Doctor d WHERE d.active = true ORDER BY d.specialization")
     List<String> findAllSpecializations();

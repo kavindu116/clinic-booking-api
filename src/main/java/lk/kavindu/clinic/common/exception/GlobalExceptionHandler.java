@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lk.kavindu.clinic.common.dto.ApiError;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,25 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InvalidDataAccessApiUsageException.class)
+    public ResponseEntity<ApiError> handleBadSort(InvalidDataAccessApiUsageException ex,
+                                                  HttpServletRequest req) {
+        log.debug("Invalid data access usage on {}: {}", req.getRequestURI(), ex.getMessage());
+
+        String message = "Invalid request parameter";
+        if (ex.getMessage() != null && ex.getMessage().contains("Sort expression")) {
+            message = "Invalid 'sort' parameter. Use a real field name, "
+                    + "for example 'sort=specialization,asc', or omit it entirely.";
+        }
+
+        return ResponseEntity.badRequest().body(ApiError.of(
+                HttpStatus.BAD_REQUEST.value(),
+                ErrorCode.VALIDATION_FAILED.name(),
+                message,
+                req.getRequestURI()));
+    }
+
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApi(ApiException ex, HttpServletRequest req) {

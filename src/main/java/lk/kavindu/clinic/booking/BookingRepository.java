@@ -15,9 +15,15 @@ import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    /**
-     * ========== CONCURRENCY CONTROL ==========
-     * PESSIMISTIC_WRITE => SELECT ... FOR UPDATE.**/
+    @Query("""
+           SELECT COUNT(b) FROM Booking b
+           WHERE b.doctor.id = :doctorId
+             AND b.slotStart = :slotStart
+             AND b.status <> lk.kavindu.clinic.booking.BookingStatus.CANCELLED
+           """)
+    long countActiveAtSlot(@Param("doctorId") Long doctorId,
+                           @Param("slotStart") Instant slotStart);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
            SELECT b FROM Booking b
@@ -27,6 +33,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
            """)
     List<Booking> lockActiveBySlot(@Param("doctorId") Long doctorId,
                                    @Param("slotStart") Instant slotStart);
+
+    @Query("""
+           SELECT COUNT(b) FROM Booking b
+           WHERE b.patient.id = :patientId
+             AND b.slotStart = :slotStart
+             AND b.status <> lk.kavindu.clinic.booking.BookingStatus.CANCELLED
+           """)
+    long countPatientBookingsAtSlot(@Param("patientId") Long patientId,
+                                    @Param("slotStart") Instant slotStart);
 
 
     @Query("""

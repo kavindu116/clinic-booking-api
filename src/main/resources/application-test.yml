@@ -1,0 +1,30 @@
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+
+app:
+  clinic:
+    timezone: Asia/Colombo
+    max-upcoming-bookings-per-patient: 3
+    cancellation-window-hours: 4
+    max-advance-booking-days: 60
+    min-advance-booking-minutes: 30
+  seed:
+    enabled: false
+  jwt:
+    secret: test-only-secret-key-that-is-definitely-long-enough-32plus-bytes
+    access-ttl-minutes: 15
+    refresh-ttl-days: 7
+    issuer: clinic-booking-api
+management:
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    lk.kavindu.clinic: INFO
