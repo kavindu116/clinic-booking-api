@@ -53,6 +53,27 @@ server:
   shutdown: graceful
 
 app:
+  outbox:
+    enabled: ${OUTBOX_ENABLED:true}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:15}
+    retain-published-days: ${OUTBOX_RETAIN_DAYS:7}
+    poll-interval-ms: ${OUTBOX_POLL_MS:5000}
+    cleanup-cron: "0 15 3 * * *"
+
+  notifications:
+    enabled: ${NOTIFICATIONS_ENABLED:true}
+
+  cache:
+    enabled: ${CACHE_ENABLED:true}
+
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    login-attempts: ${RATE_LIMIT_LOGIN_ATTEMPTS:10}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+
+  cleanup:
+    token-cron: "0 30 3 * * *"
 
   clinic:
     timezone: ${CLINIC_TIMEZONE:Asia/Colombo}
@@ -66,6 +87,7 @@ app:
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
     issuer: clinic-booking-api
+
   seed:
     enabled: ${SEED_ENABLED:true}
 
@@ -74,6 +96,9 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
+  metrics:
+    tags:
+     application: clinic-booking-api
   endpoint:
     health:
       show-details: when-authorized
@@ -94,4 +119,5 @@ logging:
     org.springframework.security: INFO
     org.hibernate.SQL: DEBUG
   pattern:
-    console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+    console: "%d{HH:mm:ss.SSS} %-5level [%thread] [%X{correlationId:-........}] %logger{36} - %msg%n"
+
