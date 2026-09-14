@@ -1,0 +1,93 @@
+# =====================================================================
+# Production profile
+# =====================================================================
+# Dev defaults walin wenas wenna one dewal withrai methana.
+# Ithuru okkoma application.yml eken enawa.
+# =====================================================================
+
+spring:
+  datasource:
+    hikari:
+      # VM ekaka Postgres eka default eken connections 100ak ganawa.
+      # App instance ekakata 20ak thibbanam instances 5ak run karanna
+      # puluwan, thawa ITHURU tikak psql ekata.
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 20000
+      max-lifetime: 1800000
+      leak-detection-threshold: 30000   # connection ekak 30s wædiya thibbanam log ekak
+
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 25
+
+  rabbitmq:
+    connection-timeout: 10000
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000
+        max-attempts: 3
+
+server:
+  forward-headers-strategy: framework
+  tomcat:
+    threads:
+      max: 100
+      min-spare: 10
+    max-connections: 5000
+    accept-count: 100
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+app:
+  seed:
+    enabled: false
+  outbox:
+    poll-interval-ms: 2000
+    max-attempts: 50
+  rate-limit:
+    enabled: true
+    login-attempts: 10
+    window-seconds: 60
+  cors:
+    allowed-origins: ${CORS_ORIGINS:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    env:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    lk.kavindu.clinic: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId:-........}] %logger{36} - %msg%n"
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    try-it-out-enabled: true

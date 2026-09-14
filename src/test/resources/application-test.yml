@@ -3,8 +3,34 @@ spring:
     properties:
       hibernate:
         format_sql: false
-  # Redis/RabbitMQ tests walata one naa (Week 1). Health checks off.
+  rabbitmq:
+    listener:
+      simple:
+
+        auto-startup: false
+
 app:
+  outbox:
+    enabled: true
+    poll-interval-ms: 3600000
+    batch-size: 50
+    max-attempts: 3
+    retain-published-days: 7
+  notifications:
+    enabled: false
+
+  cache:
+    enabled: false
+  rate-limit:
+    enabled: false
+    login-attempts: 10
+    window-seconds: 60
+  clinic:
+    timezone: Asia/Colombo
+    max-upcoming-bookings-per-patient: 3
+    cancellation-window-hours: 4
+    max-advance-booking-days: 60
+    min-advance-booking-minutes: 30
   seed:
     enabled: false
   jwt:
@@ -12,12 +38,14 @@ app:
     access-ttl-minutes: 15
     refresh-ttl-days: 7
     issuer: clinic-booking-api
+
 management:
   health:
     redis:
       enabled: false
     rabbit:
       enabled: false
+
 logging:
   level:
     org.hibernate.SQL: WARN

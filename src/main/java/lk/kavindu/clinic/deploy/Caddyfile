@@ -1,0 +1,54 @@
+# =====================================================================
+# Caddy -- reverse proxy + automatic HTTPS
+# =====================================================================
+#
+# Caddy Let's Encrypt eken certificate ekak GANNAWA, renew KARANAWA,
+# HTTP eka HTTPS ekata redirect KARANAWA -- config ekak naethuwa.
+# Nginx ekaka meka certbot ekak, cron job ekak, saha SSL config
+# lines 20ak.
+# =====================================================================
+
+{
+	email {$ACME_EMAIL}
+
+	# Staging eka test karanakota use karanna -- Let's Encrypt eke
+	# production rate limit eka satiyakata domain ekakata 5ak withrai.
+	# Uncomment karala test karanna, passe comment karanna:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$PUBLIC_HOST} {
+	encode gzip
+
+	# Security headers. Caddy eka HSTS eka automatic dhaanawa.
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Actuator eke health/info withrai eliyata. Anith ewa --
+	# /actuator/env, /actuator/beans, /actuator/prometheus --
+	# internal detail leak karanawa, ee nisa block.
+	@blocked_actuator {
+		path /actuator/*
+		not path /actuator/health
+		not path /actuator/health/*
+		not path /actuator/info
+	}
+	respond @blocked_actuator 404
+
+	reverse_proxy app:8080 {
+		# App ekata REAL client IP eka denawa. Meka naethnam rate
+		# limiter eka Caddy container eke IP eka dakinawa, ithin
+		# HAMA KENEKMA ekama bucket ekaka -- kenek limit eka
+		# gæhuwoth hama kenekma block wenawa.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+
+		health_uri /actuator/health/readiness
+		health_interval 30s
+	}
+}

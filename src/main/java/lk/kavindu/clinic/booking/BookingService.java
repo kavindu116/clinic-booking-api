@@ -8,6 +8,9 @@ import lk.kavindu.clinic.common.dto.PageResponse;
 import lk.kavindu.clinic.common.exception.ApiException;
 import lk.kavindu.clinic.common.exception.ErrorCode;
 import lk.kavindu.clinic.doctor.*;
+import lk.kavindu.clinic.notification.dto.BookingEventPayload;
+import lk.kavindu.clinic.observability.BookingMetrics;
+import lk.kavindu.clinic.outbox.OutboxWriter;
 import lk.kavindu.clinic.security.AppUserPrincipal;
 import lk.kavindu.clinic.user.Role;
 import lk.kavindu.clinic.user.User;
@@ -34,6 +37,8 @@ public class BookingService {
     private final UserRepository userRepository;
     private final SlotLock slotLock;
     private final ClinicProperties clinic;
+    private final OutboxWriter outboxWriter;
+    private final BookingMetrics metrics;
 
     @Transactional
     public BookingResponse create(AppUserPrincipal principal, CreateBookingRequest request) {
@@ -65,6 +70,10 @@ public class BookingService {
                 .status(BookingStatus.CONFIRMED)
                 .notes(request.notes())
                 .build());
+
+        outboxWriter.write("BOOKING", booking.getId(), "CONFIRMED",
+                payloadFor(booking, patient, doctor));
+        metrics.bookingCreated();
 
         log.info("Booking crated: id={} patientId={} doctorId={} slot={}",
                 booking.getId(), patient.getId(), doctor.getId(), slotStart);
@@ -98,6 +107,11 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
+
+        outboxWriter.write("BOOKING", booking.getId(), "CANCELLED",
+                payloadFor(booking, booking.getPatient(), booking.getDoctor()));
+        metrics.bookingCancelled();
+
         log.info("Booking canceled : id={} by userid={}", bookingId, principal.getId());
 
         return BookingResponse.from(booking);
@@ -193,6 +207,21 @@ public class BookingService {
                 .orElseThrow(() -> ApiException.of(ErrorCode.BOOKING_NOT_FOUND,
                         "Booking not found with id " + id));
     }
+    private BookingEventPayload payloadFor(Booking booking, User patient, Doctor doctor) {
+        return new BookingEventPayload(
+                BookingEventPayload.CURRENT_VERSION,
+                booking.getId(),
+                patient.getFullName(),
+                patient.getEmail(),
+                doctor.getUser().getFullName(),
+                doctor.getSpecialization(),
+                doctor.getConsultationFee(),
+                booking.getSlotStart(),
+                booking.getSlotEnd(),
+                clinic.timeZone(),
+                booking.getNotes());
+    }
+
 
     private BookingResponse toResponse(Booking booking, User patient, Doctor doctor) {
         return new BookingResponse(

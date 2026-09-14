@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lk.kavindu.clinic.booking.BookingRepository;
 import lk.kavindu.clinic.doctor.AvailabilityRepository;
 import lk.kavindu.clinic.doctor.DoctorRepository;
+import lk.kavindu.clinic.outbox.OutboxRepository;
 import lk.kavindu.clinic.user.RefreshTokenRepository;
 import lk.kavindu.clinic.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,10 +49,12 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected DoctorRepository doctorRepository;
     @Autowired protected AvailabilityRepository availabilityRepository;
     @Autowired protected BookingRepository bookingRepository;
+    @Autowired protected OutboxRepository outboxRepository;
 
-    /** FK order eka wædagath — children palamuwen. */
+
     @BeforeEach
     void cleanDatabase() {
+        outboxRepository.deleteAll();
         bookingRepository.deleteAll();
         availabilityRepository.deleteAll();
         doctorRepository.deleteAll();

@@ -1,0 +1,144 @@
+# =====================================================================
+# Production stack -- Oracle Cloud ARM VM ekaka duwanawa
+# =====================================================================
+#
+# Dev compose eka ekka wenaskam:
+#   - Postgres/Redis/RabbitMQ ports HOST ekata expose karanne NAA.
+#     Ewata langa wenna puluwan me network eke thiyena containers
+#     withrai. Nathnam kenekta VM eke public IP ekata port 5432
+#     ekata connect wela DB ekata enna puluwan.
+#   - Caddy ekak idiriyen -- TLS eka automatic
+#   - Resource limits -- container ekakata VM eka mulu ekama gannna
+#     baeri wenna
+#   - Restart policies -- VM eka reboot unath enne one
+#   - Log rotation -- nathnam disk eka pirenawa
+# =====================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clinic-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: clinic-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    logging: *logging
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: clinic-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging: *logging
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: clinic-booking-api:latest
+    container_name: clinic-api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://${PUBLIC_HOST}}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70.0 -XX:+UseG1GC -Duser.timezone=UTC"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: clinic-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data      # TLS certificates -- MEKA naethi wenna denne naa,
+      - caddyconfig:/config  # nathnam Let's Encrypt rate limit ekata hasu wenawa
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      ACME_EMAIL: ${ACME_EMAIL}
+    depends_on:
+      - app
+    logging: *logging
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitdata:
+  caddydata:
+  caddyconfig:
