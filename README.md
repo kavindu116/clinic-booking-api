@@ -19,24 +19,6 @@ appointment slot in the same instant must not both succeed.**
 
 ## Contents
 
-- [The problem this solves](#the-problem-this-solves)
-- [Architecture](#architecture)
-- [Domain model](#domain-model)
-- [Tech choices and why](#tech-choices-and-why)
-- [Running locally](#running-locally)
-- [API surface](#api-surface)
-- [Testing](#testing)
-- [Bugs worth remembering](#bugs-worth-remembering)
-- [Deployment](#deployment)
-- [What this is not](#what-this-is-not)
-
----
-
-## The problem this solves
-
-Most portfolio CRUD apps quietly break under concurrent load. This one is built around the
-booking race, which has a real answer and a wrong one.
-
 The naive implementation has a check-then-act race:
 
 ```
@@ -49,43 +31,6 @@ T2: INSERT booking
 
 ### Why `SELECT ... FOR UPDATE` is not the answer
 
-The obvious fix is a pessimistic row lock. It does not work here, and the reason is worth
-knowing: **`FOR UPDATE` locks rows that exist.** When the first booking for a slot is
-created, no row exists yet — so there is nothing to lock, both transactions see an empty
-result, and both insert.
-
-PostgreSQL under `READ COMMITTED` does not take a lock on a non-existent row. MySQL's
-InnoDB does, via gap locks under `REPEATABLE READ` — so this bug is database-specific,
-which is exactly why the tests run against real PostgreSQL rather than H2.
-
-### What this uses instead
-
-**Layer 1 — a transaction-scoped advisory lock**, keyed on `(doctorId, slotStart)`:
-
-```sql
-SELECT pg_advisory_xact_lock(doctor_id, slot_key)
-```
-
-Advisory locks are not tied to rows. The application names a lock and PostgreSQL
-serialises everyone who asks for the same name. The `_xact_` scope releases it
-automatically on commit or rollback, so a forgotten unlock cannot strand a connection. The
-lock is per-slot, not per-doctor, so bookings for different times still run in parallel —
-there is a test for that too.
-
-**Layer 2 — a partial unique index**, as the correctness backstop:
-
-```sql
-CREATE UNIQUE INDEX uq_active_booking_slot
-    ON bookings (doctor_id, slot_start)
-    WHERE status <> 'CANCELLED';
-```
-
-This holds even if the application has a bug, runs as several instances, or someone writes
-SQL by hand. Cancelled bookings are excluded from the index, so a released slot becomes
-bookable again without soft-delete gymnastics. When the index does fire,
-`GlobalExceptionHandler` maps it to a clean `409 SLOT_ALREADY_BOOKED` rather than a 500.
-
-Layer 1 gives a good user experience. Layer 2 guarantees correctness.
 
 `BookingConcurrencyIT` proves it: ten threads, one slot, exactly one success and nine clean
 409s — and it asserts that **no** thread reaches the database constraint, since that would
@@ -333,10 +278,6 @@ open target/site/jacoco/index.html
 | GET | `/api/v1/doctors/specializations` | — | Distinct specializations offered |
 | GET | `/api/v1/doctors/{id}` | — | Doctor profile |
 | GET | `/api/v1/doctors/{id}/availability` | — | Weekly availability rules |
-| GET | `/api/v1/doctors/{id}/slots?date=` | — | **Derived** bookable slots |
-| POST | `/api/v1/doctors` | Admin | Create a doctor account |
-| PUT | `/api/v1/doctors/{id}/availability` | Admin or self | Replace the weekly schedule |
-| DELETE | `/api/v1/doctors/{id}` | Admin | Deactivate (soft delete) |
 
 ### Bookings
 
@@ -344,39 +285,12 @@ open target/site/jacoco/index.html
 |---|---|---|---|
 | POST | `/api/v1/bookings` | Patient | Book a slot — concurrency-safe |
 | GET | `/api/v1/bookings/me` | Patient | Own bookings, paginated |
-| GET | `/api/v1/bookings/{id}` | Owner / doctor / admin | One booking |
-| PATCH | `/api/v1/bookings/{id}/cancel` | Owner / doctor / admin | Cancel |
-| PATCH | `/api/v1/bookings/{id}/reschedule` | Owner / doctor / admin | Move to another slot |
-| GET | `/api/v1/bookings/doctors/{id}` | Doctor or admin | A doctor's schedule |
+
 
 ### Booking rules
 
 Configurable under `app.clinic` — defaults in brackets.
 
-- The slot must exist on the doctor's availability grid
-- Not in the past; at least `min-advance-booking-minutes` [30] ahead
-- At most `max-advance-booking-days` [60] ahead
-- At most `max-upcoming-bookings-per-patient` [3] confirmed future bookings
-- A patient cannot hold two appointments at the same time, even with different doctors
-- Patients must cancel `cancellation-window-hours` [4] ahead; staff are exempt
-
-### Error format
-
-Every error is the same envelope, with a stable `code` clients can branch on without
-parsing prose:
-
-```json
-{
-  "timestamp": "2026-09-14T03:30:00Z",
-  "status": 409,
-  "code": "SLOT_ALREADY_BOOKED",
-  "message": "This time slot has just been taken. Please choose another slot.",
-  "path": "/api/v1/bookings"
-}
-```
-
-Requesting someone else's booking returns **404, not 403**, so IDs cannot be used to probe
-whether a booking exists. In a clinic that is a privacy question, not just a nicety.
 
 ---
 
@@ -475,24 +389,7 @@ cd deploy
 
 ---
 
-## What this is not
 
-Knowing the limits of what you built is worth more than pretending there are none.
-
-- **Single machine, no redundancy.** If the VM dies the API is down until it comes back.
-- **Database on the same box.** Fine at this size; a real deployment uses managed Postgres
-  with automated backups and point-in-time recovery.
-- **Deploys have a few seconds of downtime.** Rolling deploys need at least two app
-  instances behind the proxy.
-- **Metrics are exported but nothing scrapes them.** Prometheus and Grafana are the obvious
-  next step.
-- **The consumer's idempotency cache is in-memory.** Correct for one instance, wrong the
-  moment there are two — that needs Redis or a processed-messages table.
-- **The outbox retries at a flat interval.** Exponential backoff with a `next_attempt_at`
-  column would be kinder to a broker that is genuinely down, and would stop the log filling
-  with connection attempts during an outage.
-- **Notifications are logged, not emailed.** The pipeline is real end to end; only the final
-  delivery step is a stub. Swapping in SMTP touches one method.
 
 ---
 
