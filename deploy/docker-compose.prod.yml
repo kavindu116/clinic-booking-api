@@ -82,7 +82,7 @@ services:
 
   app:
     build:
-      context: ..
+      context: ../src/main/java/lk/kavindu/clinic
       dockerfile: Dockerfile
     image: clinic-booking-api:latest
     container_name: clinic-api
